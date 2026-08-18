@@ -1,0 +1,48 @@
+name: Build YTVideoOverlay
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Build Tools (ldid)
+        run: |
+          brew install ldid
+
+      - name: Setup Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
+
+      - name: Setup iOS SDK
+        run: |
+          curl -LO https://github.com/theos/sdks/archive/master.zip
+          unzip -q master.zip
+          mv sdks-master/*.sdk $HOME/theos/sdks/
+          rm -rf master.zip sdks-master
+
+      - name: Setup Dependencies
+        run: |
+          git clone https://github.com/PoomSmart/YouTubeHeader.git $HOME/theos/include/YouTubeHeader
+          git clone https://github.com/PoomSmart/PSHeader.git $HOME/theos/include/PSHeader
+
+      - name: Compile Dylib & Package
+        run: |
+          make package FINALPACKAGE=1
+          mkdir -p output
+          find .theos/ -name "*.dylib" -exec cp {} output/ \; 2>/dev/null || true
+          find packages/ -name "*.deb" -exec cp {} output/ \; 2>/dev/null || true
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: YTVideoOverlay-Build
+          path: output/*
